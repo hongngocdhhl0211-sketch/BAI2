@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đường ray tư duy - Phiếu Toán Tương Tác</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts Font Fredoka & Be Vietnam Pro -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Nunito', 'Be Vietnam Pro', sans-serif;
+      background: radial-gradient(circle at top right, #e0f2fe, #fdf4ff, #f0fdf4);
+      min-height: 100vh;
+      user-select: none;
+    }
+
+    /* Đổ bóng và hiệu ứng nổi cho đường ống */
+    .pipe-glow {
+      filter: drop-shadow(0 3px 6px rgba(0,0,0,0.12));
+    }
+
+    /* Hiệu ứng rung rinh khi hoàn thành */
+    @keyframes bounce-sm {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+    .animate-gentle-bounce {
+      animation: bounce-sm 2s infinite ease-in-out;
+    }
+
+    /* Con số chuyển động (Ball/Token) */
+    .traveler-token {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      transition: transform 0.05s linear;
+      z-index: 40;
+    }
+
+    /* Hiệu ứng rung lắc khi trả lời sai */
+    @keyframes shake-anim {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+    .animate-shake {
+      animation: shake-anim 0.4s ease-in-out;
+    }
+
+    /* Ô input số tùy biến */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+      -webkit-appearance: none; 
+      margin: 0; 
+    }
+  </style>
+</head>
+<body class="p-3 sm:p-6 text-slate-800 flex flex-col items-center justify-start min-h-screen">
+
+  <!-- Header Card -->
+  <div class="w-full max-w-5xl bg-white/90 backdrop-blur rounded-2xl p-4 sm:p-5 shadow-lg border border-purple-100 mb-5 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-12 h-12 bg-gradient-to-tr from-purple-600 to-indigo-500 rounded-2xl flex items-center justify-center text-white font-extrabold text-2xl shadow-md shadow-purple-300">
+        🚂
+      </div>
+      <div>
+        <h1 class="text-xl sm:text-2xl font-black text-slate-800 tracking-wide flex items-center gap-2">
+          <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Đường ray tư duy</span>
+          <span class="bg-amber-100 text-amber-700 text-sm px-2.5 py-0.5 rounded-lg border border-amber-300 inline-block font-extrabold">Số ?</span>
+        </h1>
+        <p class="text-xs sm:text-sm text-slate-500 font-medium">Lần theo từng đường ray, tính nhẩm và điền số vào ô trống rồi bấm nút để số di chuyển về đích!</p>
+      </div>
+    </div>
+
+    <!-- Nút âm thanh & trợ giúp -->
+    <div class="flex items-center gap-2">
+      <button id="soundToggleBtn" onclick="toggleMute()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition flex items-center gap-1.5 border border-slate-200">
+        <span id="soundIcon">🔊</span> <span class="hidden sm:inline">Âm thanh</span>
+      </button>
+      <button onclick="resetAll()" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold rounded-xl text-sm transition flex items-center gap-1.5 border border-rose-200">
+        🔄 <span>Làm mới</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Container Sơ đồ bài tập -->
+  <div class="w-full max-w-5xl bg-white rounded-3xl p-4 sm:p-8 shadow-xl border-2 border-indigo-100 relative overflow-hidden mb-6">
+    
+    <!-- Tiêu đề nhỏ trong bảng -->
+    <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4 text-xs sm:text-sm font-bold text-slate-400 uppercase tracking-wider">
+      <span>Đầu vào (Số ban đầu)</span>
+      <span class="hidden md:inline text-indigo-500 font-semibold text-xs lowercase">★ Lần theo màu dây để thực hiện phép tính ★</span>
+      <span>Đích đến (Kết quả)</span>
+    </div>
+
+    <!-- Vùng đồ họa SVG và các ô số HTML -->
+    <div id="boardContainer" class="relative w-full aspect-[16/9] min-h-[380px] max-h-[560px]">
+      
+      <!-- SVG Canvas chứa các đường ống nhiều màu sắc nối chuẩn theo hình gốc -->
+      <svg id="pipeSvg" viewBox="0 0 1000 560" class="w-full h-full absolute inset-0 z-0 pipe-glow" preserveAspectRatio="none">
+        <defs>
+          <!-- Hiệu ứng dải viền bóng -->
+          <linearGradient id="pinkGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#fbcfe8" />
+            <stop offset="100%" stop-color="#f9a8d4" />
+          </linearGradient>
+          <linearGradient id="blueGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#bae6fd" />
+            <stop offset="100%" stop-color="#7dd3fc" />
+          </linearGradient>
+          <linearGradient id="yellowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#fef08a" />
+            <stop offset="100%" stop-color="#fde047" />
+          </linearGradient>
+          <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#bef264" />
+            <stop offset="100%" stop-color="#a3e635" />
+          </linearGradient>
+        </defs>
+
+        <!-- 1. DÂY MÀU VÀNG (Từ ô 10 -> Uốn xuống -> ô 50) -->
+        <path id="pathYellow" 
+              d="M 175 160 
+                 L 430 160 
+                 C 490 160, 480 345, 540 345 
+                 L 820 345" 
+              fill="none" 
+              stroke="#fef08a" 
+              stroke-width="36" 
+              stroke-linecap="round" 
+              stroke-linejoin="round"/>
+        <path d="M 175 160 L 430 160 C 490 160, 480 345, 540 345 L 820 345" 
+              fill="none" stroke="#facc15" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
+
+        <!-- 2. DÂY MÀU XANH LÁ (Từ ô 6 -> Uốn lên trên -> Uốn xuống đáy -> ô dưới cùng) -->
+        <path id="pathGreen" 
+              d="M 175 420 
+                 L 275 420 
+                 C 305 420, 305 240, 335 240 
+                 C 375 240, 385 240, 565 240 
+                 C 625 240, 620 460, 675 460 
+                 L 820 460" 
+              fill="none" 
+              stroke="#bef264" 
+              stroke-width="36" 
+              stroke-linecap="round" 
+              stroke-linejoin="round"/>
+        <path d="M 175 420 L 275 420 C 305 420, 305 240, 335 240 C 375 240, 385 240, 565 240 C 625 240, 620 460, 675 460 L 820 460" 
+              fill="none" stroke="#84cc16" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
+
+        <!-- 3. DÂY MÀU HỒNG (Từ ô 7 -> Uốn lên trên cao -> ô trên cùng) -->
+        <path id="pathPink" 
+              d="M 175 290 
+                 L 330 290 
+                 C 375 290, 365 110, 415 110 
+                 L 820 110" 
+              fill="none" 
+              stroke="#fbcfe8" 
+              stroke-width="36" 
+              stroke-linecap="round" 
+              stroke-linejoin="round"/>
+        <path d="M 175 290 L 330 290 C 375 290, 365 110, 415 110 L 820 110" 
+              fill="none" stroke="#f472b6" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
+
+        <!-- 4. DÂY MÀU XANH DƯƠNG NHẠT (Từ ô 15 ở dưới -> Đi thẳng lên đỉnh -> Vòng xuống sang ngang ô số 2) -->
+        <path id="pathBlue" 
+              d="M 435 440 
+                 L 435 90 
+                 C 435 60, 510 60, 510 90 
+                 C 510 175, 520 225, 580 225 
+                 L 820 225" 
+              fill="none" 
+              stroke="#bae6fd" 
+              stroke-width="36" 
+              stroke-linecap="round" 
+              stroke-linejoin="round"/>
+        <path d="M 435 440 L 435 90 C 435 60, 510 60, 510 90 C 510 175, 520 225, 580 225 L 820 225" 
+              fill="none" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
+      </svg>
+
+      <!-- ============ CÁC Ô ĐẦU VÀO (BÊN TRÁI & ĐÁY) ============ -->
+      <!-- Ô số 10 (Vàng) -->
+      <div id="startBox-yellow" class="absolute left-[7%] top-[24%] -translate-y-1/2 w-20 sm:w-24 h-12 sm:h-14 bg-white border-2 sm:border-3 border-amber-500 rounded-xl flex items-center justify-center font-black text-2xl sm:text-3xl text-slate-800 shadow-md z-20 transition hover:scale-105">
+        10
+      </div>
+
+      <!-- Ô số 7 (Hồng) -->
+      <div id="startBox-pink" class="absolute left-[7%] top-[47%] -translate-y-1/2 w-20 sm:w-24 h-12 sm:h-14 bg-white border-2 sm:border-3 border-amber-500 rounded-xl flex items-center justify-center font-black text-2xl sm:text-3xl text-slate-800 shadow-md z-20 transition hover:scale-105">
+        7
+      </div>
+
+      <!-- Ô số 6 (Xanh lá) -->
+      <div id="startBox-green" class="absolute left-[7%] top-[70%] -translate-y-1/2 w-20 sm:w-24 h-12 sm:h-14 bg-white border-2 sm:border-3 border-amber-500 rounded-xl flex items-center justify-center font-black text-2xl sm:text-3xl text-slate-800 shadow-md z-20 transition hover:scale-105">
+        6
+      </div>
+
+      <!-- Ô số 15 (Xanh dương - ở đáy) -->
+      <div id="startBox-blue" class="absolute left-[43.5%] bottom-[5%] -translate-x-1/2 w-20 sm:w-24 h-12 sm:h-14 bg-white border-2 sm:border-3 border-amber-500 rounded-xl flex items-center justify-center font-black text-2xl sm:text-3xl text-slate-800 shadow-md z-20 transition hover:scale-105">
+        15
+      </div>
+
+      <!-- ============ CÁC NHÃN PHÉP TÍNH TRÊN ĐƯỜNG DÂY ============ -->
+      <!-- Nhãn Hồng: Thêm 5 đơn vị -->
+      <div class="absolute right-[22%] top-[19.6%] -translate-y-1/2 font-bold text-xs sm:text-base text-slate-800 pointer-events-none drop-shadow-sm flex items-center gap-1 z-10">
+        <span>thêm 5 đơn vị</span>
+      </div>
+
+      <!-- Nhãn Xanh dương: Gấp 4 lần -->
+      <div class="absolute right-[22%] top-[40.2%] -translate-y-1/2 font-bold text-xs sm:text-base text-slate-800 pointer-events-none drop-shadow-sm flex items-center gap-1 z-10">
+        <span>gấp 4 lần</span>
+      </div>
+
+      <!-- Nhãn Vàng: Gấp 5 lần -->
+      <div class="absolute right-[22%] top-[61.6%] -translate-y-1/2 font-bold text-xs sm:text-base text-slate-800 pointer-events-none drop-shadow-sm flex items-center gap-1 z-10">
+        <span>gấp 5 lần</span>
+      </div>
+
+      <!-- Nhãn Xanh lá: Thêm 8 đơn vị -->
+      <div class="absolute right-[22%] top-[82.1%] -translate-y-1/2 font-bold text-xs sm:text-base text-slate-800 pointer-events-none drop-shadow-sm flex items-center gap-1 z-10">
+        <span>thêm 8 đơn vị</span>
+      </div>
+
+      <!-- ============ CÁC Ô ĐÍCH ĐẾN (BÊN PHẢI) ============ -->
+      <!-- Đích 1: Dây Hồng (7 + 5 = 12) -->
+      <div class="absolute right-[7%] top-[19.6%] -translate-y-1/2 z-20 flex items-center">
+        <div id="targetWrapper-pink" class="relative group">
+          <input type="number" id="input-pink" placeholder="?" 
+                 class="w-16 sm:w-20 h-12 sm:h-14 bg-white border-2 sm:border-3 border-emerald-600 rounded-xl text-center font-black text-xl sm:text-2xl text-emerald-800 shadow-md focus:ring-4 focus:ring-emerald-200 outline-none transition"
+                 autocomplete="off">
+          <span id="badge-pink" class="hidden absolute -top-3 -right-3 w-7 h-7 rounded-full text-white text-xs flex items-center justify-center font-bold shadow"></span>
+        </div>
+      </div>
+
+      <!-- Đích 2: Dây Xanh dương (15 x 4 = 60) -->
+      <div class="absolute right-[7%] top-[40.2%] -translate-y-1/2 z-20 flex items-center">
+        <div id="targetWrapper-blue" class="relative group">
+          <input type="number" id="input-blue" placeholder="?" 
+                 class="w-16 sm:w-20 h-12 sm:h-14 bg-white border-2 sm:border-3 border-emerald-600 rounded-xl text-center font-black text-xl sm:text-2xl text-emerald-800 shadow-md focus:ring-4 focus:ring-emerald-200 outline-none transition"
+                 autocomplete="off">
+          <span id="badge-blue" class="hidden absolute -top-3 -right-3 w-7 h-7 rounded-full text-white text-xs flex items-center justify-center font-bold shadow"></span>
+        </div>
+      </div>
+
+      <!-- Đích 3: Dây Vàng (10 x 5 = 50 MẪU) -->
+      <div class="absolute right-[7%] top-[61.6%] -translate-y-1/2 z-20 flex items-center">
+        <div id="targetWrapper-yellow" class="relative">
+          <div class="w-16 sm:w-20 h-12 sm:h-14 bg-emerald-50 border-2 sm:border-3 border-emerald-600 rounded-xl flex items-center justify-center font-black text-xl sm:text-2xl text-emerald-800 shadow-md">
+            50
+          </div>
+          <span class="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-bold text-emerald-600 bg-white px-1.5 py-0.2 rounded border border-emerald-200">Mẫu</span>
+        </div>
+      </div>
+
+      <!-- Đích 4: Dây Xanh lá (6 + 8 = 14) -->
+      <div class="absolute right-[7%] top-[82.1%] -translate-y-1/2 z-20 flex items-center">
+        <div id="targetWrapper-green" class="relative group">
+          <input type="number" id="input-green" placeholder="?" 
+                 class="w-16 sm:w-20 h-12 sm:h-14 bg-white border-2 sm:border-3 border-emerald-600 rounded-xl text-center font-black text-xl sm:text-2xl text-emerald-800 shadow-md focus:ring-4 focus:ring-emerald-200 outline-none transition"
+                 autocomplete="off">
+          <span id="badge-green" class="hidden absolute -top-3 -right-3 w-7 h-7 rounded-full text-white text-xs flex items-center justify-center font-bold shadow"></span>
+        </div>
+      </div>
+
+      <!-- Container chứa các viên ngọc số khi chạy animation -->
+      <div id="travelersLayer" class="absolute inset-0 pointer-events-none z-30 overflow-visible"></div>
+
+    </div>
+  </div>
+
+  <!-- Chỉ hiển thị 4 nút tương ứng 4 số -->
+  <div class="w-full max-w-4xl bg-white/95 backdrop-blur rounded-2xl p-4 sm:p-5 shadow-lg border border-indigo-100 flex flex-col items-center">
+    <div class="text-xs sm:text-sm font-bold text-slate-600 mb-3 text-center">
+      👉 Điền số vào ô <span class="text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded font-black">?</span> rồi bấm nút tương ứng để kiểm tra và cho số di chuyển:
+    </div>
+
+    <!-- Hàng 4 nút đại diện cho 4 số theo màu -->
+    <div class="w-full grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      
+      <!-- Nút Số 7 (Hồng) -->
+      <button onclick="handleCheckAndRun('pink')" class="group relative py-3.5 px-4 bg-gradient-to-b from-pink-50 to-pink-100/90 hover:from-pink-100 hover:to-pink-200 text-pink-700 border-2 border-pink-400 rounded-2xl font-black text-base shadow-md active:scale-95 transition flex items-center justify-center gap-2">
+        <span class="w-4 h-4 rounded-full bg-pink-500 shadow-sm border border-white"></span>
+        <span>Số 7</span>
+        <span class="text-xs text-pink-500 font-semibold group-hover:translate-x-0.5 transition">▶</span>
+      </button>
+
+      <!-- Nút Số 15 (Lam) -->
+      <button onclick="handleCheckAndRun('blue')" class="group relative py-3.5 px-4 bg-gradient-to-b from-sky-50 to-sky-100/90 hover:from-sky-100 hover:to-sky-200 text-sky-800 border-2 border-sky-400 rounded-2xl font-black text-base shadow-md active:scale-95 transition flex items-center justify-center gap-2">
+        <span class="w-4 h-4 rounded-full bg-sky-500 shadow-sm border border-white"></span>
+        <span>Số 15</span>
+        <span class="text-xs text-sky-600 font-semibold group-hover:translate-x-0.5 transition">▶</span>
+      </button>
+
+      <!-- Nút Số 10 (Vàng - Mẫu) -->
+      <button onclick="handleCheckAndRun('yellow')" class="group relative py-3.5 px-4 bg-gradient-to-b from-amber-50 to-amber-100/90 hover:from-amber-100 hover:to-amber-200 text-amber-800 border-2 border-amber-400 rounded-2xl font-black text-base shadow-md active:scale-95 transition flex items-center justify-center gap-2">
+        <span class="w-4 h-4 rounded-full bg-amber-500 shadow-sm border border-white"></span>
+        <span>Số 10 (Mẫu)</span>
+        <span class="text-xs text-amber-600 font-semibold group-hover:translate-x-0.5 transition">▶</span>
+      </button>
+
+      <!-- Nút Số 6 (Xanh lá) -->
+      <button onclick="handleCheckAndRun('green')" class="group relative py-3.5 px-4 bg-gradient-to-b from-lime-50 to-lime-100/90 hover:from-lime-100 hover:to-lime-200 text-lime-800 border-2 border-lime-500 rounded-2xl font-black text-base shadow-md active:scale-95 transition flex items-center justify-center gap-2">
+        <span class="w-4 h-4 rounded-full bg-lime-500 shadow-sm border border-white"></span>
+        <span>Số 6</span>
+        <span class="text-xs text-lime-700 font-semibold group-hover:translate-x-0.5 transition">▶</span>
+      </button>
+
+    </div>
+
+    <!-- Thông báo ngắn gọn phản hồi trực tiếp khi bấm nút -->
+    <div id="statusToast" class="hidden mt-3 text-xs sm:text-sm font-bold px-4 py-2 rounded-xl transition text-center"></div>
+  </div>
+
+  <script>
+    // ==========================================
+    // 1. HỆ THỐNG ÂM THANH NỘI TẠI (Web Audio API)
+    // ==========================================
+    let audioCtx = null;
+    let isMuted = false;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playSound(type) {
+      if (isMuted) return;
+      try {
+        initAudio();
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === 'pop') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(320, now);
+          osc.frequency.exponentialRampToValueAtTime(650, now + 0.12);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+          osc.start(now);
+          osc.stop(now + 0.13);
+        } else if (type === 'transform') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.linearRampToValueAtTime(880, now + 0.18);
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+          osc.start(now);
+          osc.stop(now + 0.22);
+        } else if (type === 'success') {
+          const notes = [523.25, 659.25, 783.99, 1046.50]; // Đô - Mi - Sol - Đô đố
+          notes.forEach((freq, idx) => {
+            const o = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            o.connect(g);
+            g.connect(audioCtx.destination);
+            o.type = 'sine';
+            o.frequency.setValueAtTime(freq, now + idx * 0.1);
+            g.gain.setValueAtTime(0.25, now + idx * 0.1);
+            g.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.1 + 0.25);
+            o.start(now + idx * 0.1);
+            o.stop(now + idx * 0.1 + 0.27);
+          });
+        } else if (type === 'error') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(220, now);
+          osc.frequency.linearRampToValueAtTime(140, now + 0.25);
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+          osc.start(now);
+          osc.stop(now + 0.26);
+        }
+      } catch (e) {
+        console.warn('Audio not allowed yet or error', e);
+      }
+    }
+
+    function toggleMute() {
+      isMuted = !isMuted;
+      document.getElementById('soundIcon').textContent = isMuted ? '🔇' : '🔊';
+    }
+
+    // ==========================================
+    // 2. DỮ LIỆU ĐƯỜNG DÂY & BÀI TOÁN
+    // ==========================================
+    const PIPES_CONFIG = {
+      pink: {
+        pathId: 'pathPink',
+        startNum: 7,
+        operation: 'thêm 5',
+        endNum: 12,
+        colorBg: '#f472b6',
+        textColor: '#ffffff',
+        inputElementId: 'input-pink',
+        badgeId: 'badge-pink'
+      },
+      blue: {
+        pathId: 'pathBlue',
+        startNum: 15,
+        operation: 'gấp 4 lần',
+        endNum: 60,
+        colorBg: '#38bdf8',
+        textColor: '#ffffff',
+        inputElementId: 'input-blue',
+        badgeId: 'badge-blue'
+      },
+      yellow: {
+        pathId: 'pathYellow',
+        startNum: 10,
+        operation: 'gấp 5 lần',
+        endNum: 50,
+        colorBg: '#eab308',
+        textColor: '#ffffff',
+        inputElementId: null, // Đã có mẫu 50
+        badgeId: null
+      },
+      green: {
+        pathId: 'pathGreen',
+        startNum: 6,
+        operation: 'thêm 8',
+        endNum: 14,
+        colorBg: '#84cc16',
+        textColor: '#ffffff',
+        inputElementId: 'input-green',
+        badgeId: 'badge-green'
+      }
+    };
+
+    // ==========================================
+    // 3. LOGIC KIỂM TRA ĐIỀN ĐÚNG MỚI CHO CHẠY
+    // ==========================================
+    function showNotification(msg, type) {
+      const toast = document.getElementById('statusToast');
+      toast.classList.remove('hidden');
+      if (type === 'success') {
+        toast.className = "mt-3 text-xs sm:text-sm font-bold px-4 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-300 animate-gentle-bounce";
+      } else {
+        toast.className = "mt-3 text-xs sm:text-sm font-bold px-4 py-1.5 rounded-xl bg-rose-100 text-rose-700 border border-rose-300 animate-shake";
+      }
+      toast.innerHTML = msg;
+    }
+
+    function handleCheckAndRun(colorKey) {
+      initAudio();
+      const config = PIPES_CONFIG[colorKey];
+
+      // Trường hợp màu Vàng (đã là mẫu số 50 có sẵn)
+      if (colorKey === 'yellow') {
+        showNotification("✨ Số 10 là bài mẫu (10 × 5 = 50). Đang di chuyển...", "success");
+        animateSingleColor('yellow');
+        return;
+      }
+
+      const input = document.getElementById(config.inputElementId);
+      const badge = document.getElementById(config.badgeId);
+      const rawVal = input.value.trim();
+      const userVal = parseInt(rawVal, 10);
+
+      // Nếu học sinh điền SAI hoặc CHƯA ĐIỀN
+      if (!rawVal || isNaN(userVal) || userVal !== config.endNum) {
+        playSound('error');
+        // Không cho chạy, báo hiệu rung lắc màu đỏ tại ô nhập
+        input.classList.remove('animate-shake');
+        void input.offsetWidth; // kích hoạt re-flow lại CSS animation
+        input.classList.add('animate-shake');
+        input.className = "w-16 sm:w-20 h-12 sm:h-14 bg-rose-50 border-2 sm:border-3 border-rose-500 rounded-xl text-center font-black text-xl sm:text-2xl text-rose-700 shadow-md ring-2 ring-rose-200 animate-shake";
+        
+        badge.classList.remove('hidden');
+        badge.className = "absolute -top-3 -right-3 w-7 h-7 rounded-full bg-rose-500 text-white text-xs flex items-center justify-center font-bold shadow";
+        badge.textContent = "✗";
+
+        input.focus();
+        showNotification(`❌ Kết quả của <b>Số ${config.startNum}</b> chưa chính xác! Em hãy tính lại để mở khóa đường chạy nhé.`, "error");
+        return;
+      }
+
+      // Nếu học sinh ĐIỀN ĐÚNG
+      playSound('success');
+      input.className = "w-16 sm:w-20 h-12 sm:h-14 bg-emerald-50 border-2 sm:border-3 border-emerald-500 rounded-xl text-center font-black text-xl sm:text-2xl text-emerald-700 shadow-md ring-2 ring-emerald-300";
+      badge.classList.remove('hidden');
+      badge.className = "absolute -top-3 -right-3 w-7 h-7 rounded-full bg-emerald-500 text-white text-xs flex items-center justify-center font-bold shadow animate-bounce";
+      badge.textContent = "✓";
+
+      showNotification(`🎉 Chính xác! <b>Số ${config.startNum}</b> đang tiến về đích!`, "success");
+
+      // Chạy hiệu ứng số di chuyển dọc theo đường ống
+      animateSingleColor(colorKey);
+    }
+
+    // ==========================================
+    // 4. CHUYỂN ĐỘNG TRƯỢT SỐ THEO ĐƯỜNG DÂY (SVG MOTION)
+    // ==========================================
+    const activeAnimations = {};
+
+    function animateSingleColor(colorKey) {
+      playSound('pop');
+
+      const config = PIPES_CONFIG[colorKey];
+      const path = document.getElementById(config.pathId);
+      const container = document.getElementById('boardContainer');
+      const travelersLayer = document.getElementById('travelersLayer');
+
+      // Nếu đang chạy hoạt ảnh màu này thì hủy để chạy mới
+      if (activeAnimations[colorKey]) {
+        cancelAnimationFrame(activeAnimations[colorKey]);
+        const oldEl = document.getElementById('token-' + colorKey);
+        if (oldEl) oldEl.remove();
+      }
+
+      // Tạo viên ngọc số
+      const token = document.createElement('div');
+      token.id = 'token-' + colorKey;
+      token.className = 'traveler-token w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-black text-sm sm:text-lg shadow-2xl border-2 border-white ring-4 transition-all';
+      token.style.backgroundColor = config.colorBg;
+      token.style.color = config.textColor;
+      token.style.boxShadow = `0 6px 16px ${config.colorBg}88`;
+      token.textContent = config.startNum;
+
+      travelersLayer.appendChild(token);
+
+      const pathLength = path.getTotalLength();
+      const duration = 2400; // 2.4 giây di chuyển
+      let startTime = null;
+      let hasTransformed = false;
+
+      function step(timestamp) {
+        if (!startTime) startTime = timestamp;
+        const progress = Math.min((timestamp - startTime) / duration, 1);
+
+        // Lấy tọa độ tương đối từ SVG
+        const point = path.getPointAtLength(progress * pathLength);
+        
+        // Chuyển đổi tọa độ SVG viewBox (1000x560) sang kích thước thực của container
+        const cWidth = container.clientWidth;
+        const cHeight = container.clientHeight;
+        const xReal = (point.x / 1000) * cWidth;
+        const yReal = (point.y / 560) * cHeight;
+
+        token.style.left = `${xReal}px`;
+        token.style.top = `${yReal}px`;
+
+        // Khi đi qua 55% quãng đường (trạm phép tính) -> biến hình thành kết quả!
+        if (progress >= 0.55 && !hasTransformed) {
+          hasTransformed = true;
+          token.textContent = config.endNum;
+          token.classList.add('scale-125');
+          playSound('transform');
+          setTimeout(() => token.classList.remove('scale-125'), 200);
+        }
+
+        if (progress < 1) {
+          activeAnimations[colorKey] = requestAnimationFrame(step);
+        } else {
+          // Đến đích
+          playSound('pop');
+          token.classList.add('scale-110');
+
+          // Hiệu ứng pháo hoa nhỏ nếu hoàn thành
+          triggerConfettiEffect();
+
+          // Giữ viên token trong 1s rồi mờ dần biến mất
+          setTimeout(() => {
+            token.style.opacity = '0';
+            token.style.transition = 'opacity 0.5s ease-out';
+            setTimeout(() => {
+              if (token.parentElement) token.remove();
+              delete activeAnimations[colorKey];
+            }, 500);
+          }, 1000);
+        }
+      }
+
+      activeAnimations[colorKey] = requestAnimationFrame(step);
+    }
+
+    // ==========================================
+    // 5. CÁC HÀM TIỆN ÍCH (LÀM MỚI & PHÁO HOA)
+    // ==========================================
+    function resetAll() {
+      // Hủy mọi animation
+      Object.keys(activeAnimations).forEach(key => {
+        cancelAnimationFrame(activeAnimations[key]);
+      });
+      document.getElementById('travelersLayer').innerHTML = '';
+
+      // Reset các ô input
+      ['pink', 'blue', 'green'].forEach(key => {
+        const item = PIPES_CONFIG[key];
+        const input = document.getElementById(item.inputElementId);
+        const badge = document.getElementById(item.badgeId);
+        input.value = '';
+        input.className = "w-16 sm:w-20 h-12 sm:h-14 bg-white border-2 sm:border-3 border-emerald-600 rounded-xl text-center font-black text-xl sm:text-2xl text-emerald-800 shadow-md focus:ring-4 focus:ring-emerald-200 outline-none transition";
+        badge.className = "hidden";
+      });
+
+      const toast = document.getElementById('statusToast');
+      toast.classList.add('hidden');
+      playSound('pop');
+    }
+
+    // Hiệu ứng pháo hoa vui nhộn không cần thư viện ngoài
+    function triggerConfettiEffect() {
+      const colors = ['#f43f5e', '#ec4899', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b'];
+      for (let i = 0; i < 25; i++) {
+        const conf = document.createElement('div');
+        conf.className = 'fixed rounded-full pointer-events-none z-50';
+        const size = Math.random() * 8 + 6;
+        conf.style.width = `${size}px`;
+        conf.style.height = `${size}px`;
+        conf.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        conf.style.left = `${Math.random() * 90 + 5}vw`;
+        conf.style.top = '-20px';
+        conf.style.opacity = '1';
+        conf.style.transform = `rotate(${Math.random() * 360}deg)`;
+        conf.style.transition = `all ${Math.random() * 1.2 + 1}s cubic-bezier(0.25, 1, 0.5, 1)`;
+        document.body.appendChild(conf);
+
+        setTimeout(() => {
+          conf.style.top = `${Math.random() * 80 + 20}vh`;
+          conf.style.transform = `translateX(${(Math.random() - 0.5) * 200}px) rotate(${Math.random() * 720}deg)`;
+          conf.style.opacity = '0';
+        }, 30);
+
+        setTimeout(() => conf.remove(), 2400);
+      }
+    }
+  </script>
+</body>
+</html>
